@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab 21 | Modo Derretido</title>
+    <style>
+        :root {
+            --bg: #0f0f0f; --bg2: #161616; --bg3: #1f1f1f; --border: #2e2e2e;
+            --text: #e8e8e8; --text2: #a0a0a0; --accent: #7eb8f7; --accent2: #5a9fd4;
+            --red: #c45f5f; --green: #4caf78; --yellow: #d4a843;
+            --font: 'Segoe UI', system-ui, sans-serif; --mono: monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: var(--font); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Navbar */
+        #topbar { padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg2); }
+        .title { font-weight: bold; color: var(--accent); letter-spacing: 1px; font-size: 14px; }
+        .global-actions { display: flex; gap: 10px; }
+        .btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s; }
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-danger:hover { border-color: var(--red); color: var(--red); }
+        
+        /* Layout */
+        #workspace { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Sidebar (Params & Prompts) */
+        #sidebar { width: 320px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .panel-section { padding: 15px; border-bottom: 1px solid var(--border); }
+        .panel-label { font-family: var(--mono); font-size: 10px; color: var(--text2); text-transform: uppercase; margin-bottom: 10px; display: block; }
+        
+        .metadata-bar { font-family: var(--mono); font-size: 10px; color: var(--accent2); background: rgba(90,159,212,0.1); padding: 6px; border-radius: 4px; margin-top: 5px; }
+        select, input[type="range"] { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 5px; border-radius: 4px; outline: none; }
+        
+        #prompt-textarea { width: 100%; height: 120px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px; resize: none; border-radius: 4px; font-family: var(--mono); font-size: 11px; outline: none; }
+        
+        .slider-group { margin-top: 12px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+        .slider-val { color: var(--accent); font-family: var(--mono); }
+        
+        /* Chat Area */
+        #chat-container { flex: 1; display: flex; flex-direction: column; background: var(--bg); }
+        #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        
+        .msg { max-width: 85%; align-self: flex-start; display: flex; flex-direction: column; gap: 5px; animation: fadeIn 0.3s; }
+        .msg.user { align-self: flex-end; align-items: flex-end; }
+        .msg-bubble { background: #1a1a1a; padding: 12px 15px; border-radius: 6px; border: 1px solid var(--border); line-height: 1.5; font-size: 14px; white-space: pre-wrap; }
+        .msg.user .msg-bubble { background: #1a2332; border-color: #2a4060; }
+        
+        .turn-tools { display: flex; gap: 8px; font-size: 10px; color: var(--text2); align-items: center; }
+        .turn-tools button { background: none; border: none; color: var(--text2); cursor: pointer; text-decoration: underline; }
+        .turn-tools button:hover { color: var(--accent); }
+        .turn-tools button.danger:hover { color: var(--red); }
+        .turn-params { background: #111; padding: 6px; border: 1px dashed var(--border); border-radius: 4px; font-family: var(--mono); display: none; margin-top: 4px; color: #888; }
+        
+        /* Input Area */
+        #input-area { padding: 15px 20px; border-top: 1px solid var(--border); background: var(--bg2); display: flex; gap: 10px; align-items: flex-end; }
+        #user-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 10px; font-size: 14px; border-radius: 4px; resize: none; outline: none; height: 42px; font-family: var(--font); }
+        .btn-action { height: 42px; padding: 0 20px; font-weight: bold; background: var(--accent2); color: #000; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-stop { background: var(--red); color: white; display: none; }
+        
+        /* Modal & Alerts */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .modal { background: var(--bg2); padding: 20px; border: 1px solid var(--accent); border-radius: 6px; width: 400px; display: flex; flex-direction: column; gap: 15px; }
+        .modal textarea, .modal input { width: 100%; background: var(--bg3); border: 1px solid var(--border); padding: 8px; color: white; outline:none; }
+        
+        .scrub-alert { background: rgba(196,95,95,0.15); border: 1px solid var(--red); padding: 10px; border-radius: 4px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .scrub-alert button { padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-yes { background: var(--red); color: white; }
+        .btn-no { background: var(--bg3); color: white; border: 1px solid var(--border); }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="topbar">
+        <div class="title">LAB21 // MODO DERRETIDO</div>
+        <div class="global-actions">
+            <button class="btn" onclick="deshacerUltimoTurno()">↩️ Deshacer Último</button>
+            <button class="btn btn-danger" onclick="resetGlobal()">🔄 Reset Default</button>
+            <button class="btn" onclick="window.open('/', '_blank')">🆕 Nueva Pestaña</button>
+            <button class="btn" style="border-color:var(--accent);" onclick="document.getElementById('modal-fin').style.display='flex'">💾 Finalizar Sesión</button>
+        </div>
+    </div>
+
+    <div id="workspace">
+        <div id="sidebar">
+            <div class="panel-section">
+                <span class="panel-label">1. Entorno de Ejecución</span>
+                <select id="sel-model"><option>Cargando modelos...</option></select>
+                <div id="metadata-bar" class="metadata-bar">Contexto: -- | Tamaño: -- | Cuant: --</div>
+                
+                <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:baseline;">
+                    <span class="panel-label">System Prompt</span>
+                    <select id="sel-prompt" style="width:130px; font-size:10px;"><option value="">Cargar .txt...</option></select>
+                </div>
+                <textarea id="prompt-textarea" placeholder="Eres un asistente experto..."></textarea>
+            </div>
+            
+            <div class="panel-section" style="flex:1; overflow-y:auto;">
+                <span class="panel-label">2. Parámetros (Inferencia Líquida)</span>
+                
+                <div class="slider-group">
+                    <div class="slider-header"><span>Temperatura</span><span class="slider-val" id="val-temp">0.8</span></div>
+                    <input type="range" id="sl-temp" min="0" max="2" step="0.1" value="0.8" oninput="document.getElementById('val-temp').innerText=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-header"><span>Top P</span><span class="slider-val" id="val-topp">0.95</span></div>
+                    <input type="range" id="sl-topp" min="0" max="1" step="0.05" value="0.95" oninput="document.getElementById('val-topp').innerText=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-header"><span>Top K</span><span class="slider-val" id="val-topk">40</span></div>
+                    <input type="range" id="sl-topk" min="0" max="100" step="1" value="40" oninput="document.getElementById('val-topk').innerText=this.value">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-header"><span>Max Tokens Salida</span><span class="slider-val" id="val-tokens">1024</span></div>
+                    <input type="range" id="sl-tokens" min="128" max="8192" step="128" value="1024" oninput="document.getElementById('val-tokens').innerText=this.value">
+                </div>
+                <div class="slider-group" style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 10px;">
+                    <div class="slider-header"><span style="color:var(--accent);">Turnos en Memoria</span><span class="slider-val" id="val-hist">6</span></div>
+                    <input type="range" id="sl-hist" min="0" max="20" step="1" value="6" oninput="document.getElementById('val-hist').innerText=this.value">
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-container">
+            <div id="chat"></div>
+            <div id="input-area">
+                <textarea id="user-input" placeholder="Ingresa tu prompt (Enter para enviar, Shift+Enter para salto de línea)..."></textarea>
+                <button id="btn-send" class="btn-action" onclick="enviarMensaje()">ENVIAR</button>
+                <button id="btn-stop" class="btn-action btn-stop" onclick="abortar()">🛑 STOP</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-fin" class="modal-overlay">
+        <div class="modal">
+            <h3 style="color:var(--accent);">Registrar Experimento</h3>
+            <input type="text" id="modal-subtitulo" placeholder="Subtítulo humano (Ej. Prueba estrés Qwen)">
+            <textarea id="modal-reacciones" rows="4" placeholder="Reacciones viscerales... (Ej. Se rompió en el turno 3)"></textarea>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn" onclick="document.getElementById('modal-fin').style.display='none'">Cancelar</button>
+                <button class="btn-action" onclick="finalizarSesion()" style="height:auto; padding:8px 15px;">Guardar y Limpiar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionID = "lab_" + Math.floor(Date.now() / 1000);
+        let interacciones = [];
+        let estadoBase = null;
+        let abortController = null;
+        let modelosCache = {}; 
+        
+        let promptArchivoNombre = "";
+        let promptArchivoTexto = "";
+        let cargandoPrompt = false;
+
+        window.onload = async () => {
+            await cargarModelos();
+            await cargarListaPrompts();
+        };
+
+        // --- Modelos y Metadatos ---
+        async function cargarModelos() {
+            try {
+                const res = await fetch("/api/modelos");
+                const data = await res.json();
+                const sel = document.getElementById("sel-model");
+                sel.innerHTML = "";
+                data.data.forEach(m => {
+                    modelosCache[m.id] = m.metadatos;
+                    const opt = document.createElement("option");
+                    opt.value = m.id; opt.innerText = m.id;
+                    sel.appendChild(opt);
+                });
+                actualizarMetadatos();
+                
+                // Ajustar límites dinámicamente si cambia
+                sel.addEventListener("change", () => {
+                    actualizarMetadatos();
+                    const maxCtx = modelosCache[sel.value]?.contexto_max || 4096;
+                    document.getElementById("sl-tokens").max = maxCtx;
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function actualizarMetadatos() {
+            const mId = document.getElementById("sel-model").value;
+            const meta = modelosCache[mId];
+            if(meta) {
+                document.getElementById("metadata-bar").innerText = `Contexto: ${meta.contexto_max} | Tamaño: ${meta.tamano} | Cuant: ${meta.cuantizacion}`;
+            }
+        }
+
+        // --- Prompts .txt ---
+        async function cargarListaPrompts() {
+            const res = await fetch("/api/prompts");
+            const data = await res.json();
+            const sel = document.getElementById("sel-prompt");
+            data.prompts.forEach(p => {
+                const opt = document.createElement("option");
+                opt.value = p; opt.innerText = p;
+                sel.appendChild(opt);
+            });
+            
+            sel.addEventListener("change", async (e) => {
+                if(!e.target.value) return;
+                cargandoPrompt = true;
+                const r = await fetch(`/api/prompts/${e.target.value}`);
+                const d = await r.json();
+                document.getElementById("prompt-textarea").value = d.contenido;
+                promptArchivoTexto = d.contenido.trim();
+                promptArchivoNombre = e.target.value.replace(".txt", "");
+                setTimeout(() => cargandoPrompt = false, 50);
+            });
+            
+            document.getElementById("prompt-textarea").addEventListener("input", () => {
+                if (!cargandoPrompt && promptArchivoNombre) {
+                    if(document.getElementById("prompt-textarea").value.trim() !== promptArchivoTexto) {
+                        if (!promptArchivoNombre.includes("+custom")) promptArchivoNombre += "+custom";
+                    }
+                }
+            });
+        }
+
+        function obtenerEstado() {
+            return {
+                modelo: document.getElementById("sel-model").value,
+                system_prompt: document.getElementById("prompt-textarea").value.trim(),
+                origen_prompt: promptArchivoNombre || "custom",
+                temperatura: parseFloat(document.getElementById("sl-temp").value),
+                top_p: parseFloat(document.getElementById("sl-topp").value),
+                top_k: parseInt(document.getElementById("sl-topk").value),
+                max_tokens: parseInt(document.getElementById("sl-tokens").value),
+                limite_historial: parseInt(document.getElementById("sl-hist").value)
+            };
+        }
+
+        // --- Motor de Chat ---
+        document.getElementById("user-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
+        });
+
+        async function enviarMensaje() {
+            const input = document.getElementById("user-input");
+            const texto = input.value.trim();
+            if (!texto) return;
+
+            const estado = obtenerEstado();
+            input.value = "";
+            alternarBotones(true);
+
+            // Armar historial cortado
+            let hist = []; let turnos = 0;
+            for (let i = interacciones.length - 1; i >= 0 && turnos < estado.limite_historial; i--) {
+                if (interacciones[i].role !== "system") {
+                    hist.unshift({role: interacciones[i].role, content: interacciones[i].content});
+                    if (interacciones[i].role === "user") turnos++;
+                }
+            }
+
+            const chat = document.getElementById("chat");
+            const userBurbuja = document.createElement("div");
+            userBurbuja.className = "msg user";
+            userBurbuja.innerHTML = `<div class="msg-bubble">${texto}</div>`;
+            chat.appendChild(userBurbuja);
+            interacciones.push({role: "user", content: texto});
+
+            const tId = Date.now();
+            const botBurbuja = document.createElement("div");
+            botBurbuja.className = "msg";
+            botBurbuja.id = `msg_${tId}`;
+            botBurbuja.innerHTML = `
+                <div class="msg-bubble content">⏳ Generando...</div>
+                <div class="turn-tools" id="tools_${tId}" style="display:none;">
+                    <span id="metricas_${tId}" style="color:var(--accent2); font-weight:bold;"></span>
+                    <button onclick="toggleParams('${tId}')">[⚙️ Parámetros]</button>
+                    <button class="danger" onclick="podarDesde('${tId}')">[✂️ Podar desde aquí]</button>
+                </div>
+                <div id="params_${tId}" class="turn-params">
+                    Mod: ${estado.modelo} | T: ${estado.temperatura} | Tk: ${estado.top_k} | Tp: ${estado.top_p} <br>
+                    Sys (${estado.origen_prompt}): "${estado.system_prompt.substring(0,60)}..."
+                </div>
+            `;
+            chat.appendChild(botBurbuja);
+            chat.scrollTop = chat.scrollHeight;
+
+            abortController = new AbortController();
+            let respuestaCompleta = "";
+            let metricas = null;
+
+            try {
+                const res = await fetch("/api/inferencia", {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ ...estado, mensajes_historial: hist, prompt_actual: texto }),
+                    signal: abortController.signal
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                const divContent = botBurbuja.querySelector(".content");
+                divContent.innerText = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    
+                    if (chunk.includes("[METRICAS_FINAL]")) {
+                        const pts = chunk.split("[METRICAS_FINAL]||");
+                        respuestaCompleta += pts[0];
+                        const ms = pts[1].split("||");
+                        metricas = { tiempo_s: parseFloat(ms[0]), tps: parseFloat(ms[1]) };
+                    } else {
+                        respuestaCompleta += chunk;
+                    }
+                    divContent.innerText = respuestaCompleta;
+                    chat.scrollTop = chat.scrollHeight;
+                }
+
+                guardarTurno(estado, respuestaCompleta, metricas);
+                document.getElementById(`tools_${tId}`).style.display = "flex";
+                document.getElementById(`metricas_${tId}`).innerText = `${metricas.tiempo_s}s | ${metricas.tps} T/s`;
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    botBurbuja.querySelector(".content").innerHTML += '<br><span style="color:var(--red); font-weight:bold;">[🛑 Abortado]</span>';
+                    mostrarAlertaScrub(botBurbuja, tId); // Dispara flujo rápido de limpieza
+                } else {
+                    botBurbuja.querySelector(".content").innerText = "Error de conexión.";
+                }
+            } finally {
+                alternarBotones(false);
+            }
+        }
+
+        // --- Lógica de Estado (Delta Tracking) ---
+        function guardarTurno(estado, respuesta, metricas) {
+            let reg = { role: "assistant", content: respuesta, metricas };
+            if (!estadoBase) {
+                estadoBase = estado;
+                reg.estado_inferencia = estado;
+            } else {
+                let cambios = {};
+                for (let k in estado) { if (estado[k] !== estadoBase[k]) cambios[k] = estado[k]; }
+                if (Object.keys(cambios).length > 0) { reg.cambios_inferencia = cambios; estadoBase = estado; }
+            }
+            interacciones.push(reg);
+        }
+
+        // --- Herramientas UI ---
+        function alternarBotones(gen) {
+            document.getElementById("btn-send").style.display = gen ? "none" : "block";
+            document.getElementById("btn-stop").style.display = gen ? "block" : "none";
+        }
+        function abortar() { if (abortController) abortController.abort(); }
+        function toggleParams(id) {
+            const p = document.getElementById(`params_${id}`);
+            p.style.display = p.style.display === "none" ? "block" : "none";
+        }
+
+        // --- Poda y Time Travel ---
+        function podarDesde(id_HTML) {
+            const burbuja = document.getElementById(`msg_${id_HTML}`);
+            if(!burbuja) return;
+            
+            // Encontrar el índice en el DOM para cortar el array
+            const nodos = Array.from(document.getElementById("chat").children);
+            const indexDomTarget = nodos.indexOf(burbuja);
+            
+            // El DOM tiene 2 div por turno (User, Assistant). indexDomTarget es el Assistant.
+            // Entonces el turno del User es (indexDomTarget - 1). Cortamos el array desde ahí.
+            interacciones.splice(indexDomTarget - 1);
+            
+            // Eliminar del DOM todo lo que esté de ahí hacia adelante
+            for (let i = nodos.length - 1; i >= indexDomTarget - 1; i--) {
+                nodos[i].remove();
+            }
+        }
+
+        function deshacerUltimoTurno() {
+            const chat = document.getElementById("chat");
+            if(chat.children.length >= 2) {
+                chat.lastElementChild.remove(); // Borra asistant
+                chat.lastElementChild.remove(); // Borra user
+                interacciones.splice(-2);
+            }
+        }
+
+        function mostrarAlertaScrub(burbujaDOM, tId) {
+            const div = document.createElement("div");
+            div.className = "scrub-alert";
+            div.innerHTML = `
+                <span>¿Descartar esta interacción defectuosa?</span>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-yes" onclick="podarDesde('${tId}')">🗑️ Sí, limpiar y reintentar</button>
+                    <button class="btn-no" onclick="this.parentElement.parentElement.remove()">💾 No, conservar</button>
+                </div>
+            `;
+            burbujaDOM.appendChild(div);
+        }
+
+        function resetGlobal() {
+            document.getElementById("prompt-textarea").value = "Eres un asistente experto...";
+            ["temp", "topp", "topk", "tokens", "hist"].forEach(id => {
+                const el = document.getElementById(`sl-${id}`);
+                el.value = el.defaultValue; document.getElementById(`val-${id}`).innerText = el.value;
+            });
+        }
+
+        // --- Guardado Final ---
+        async function finalizarSesion() {
+            if(interacciones.length === 0) return alert("No hay datos");
+            const paramFin = obtenerEstado();
+            
+            await fetch("/api/sesiones/finalizar", {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    id_sesion: sessionID,
+                    subtitulo_humano: document.getElementById("modal-subtitulo").value,
+                    reacciones_viscerales: document.getElementById("modal-reacciones").value,
+                    historial_completo: interacciones,
+                    parametros_finales: paramFin,
+                    metadatos_modelo: modelosCache[paramFin.modelo] || {}
+                })
+            });
+            
+            window.location.reload(); // Reset limpio total
+        }
+    </script>
+</body>
+</html>
